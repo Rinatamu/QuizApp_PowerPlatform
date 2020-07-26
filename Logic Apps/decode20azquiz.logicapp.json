@@ -1,0 +1,338 @@
+{
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "$connections": {
+            "defaultValue": {},
+            "type": "Object"
+        }
+    },
+    "triggers": {
+        "manual": {
+            "type": "Request",
+            "kind": "Http",
+            "inputs": {
+                "schema": {
+                    "properties": {
+                        "answer_id": {
+                            "type": "string"
+                        },
+                        "identifier": {
+                            "type": "string"
+                        },
+                        "isFirst": {
+                            "type": "boolean"
+                        },
+                        "nickname": {
+                            "type": "string"
+                        },
+                        "question_id": {
+                            "type": "integer"
+                        }
+                    },
+                    "type": "object"
+                }
+            }
+        }
+    },
+    "actions": {
+        "QuizData_Get": {
+            "runAfter": {
+                "var_init_count": [
+                    "Succeeded"
+                ]
+            },
+            "type": "ApiConnection",
+            "inputs": {
+                "host": {
+                    "connection": {
+                        "name": "@parameters('$connections')['commondataservice']['connectionId']"
+                    }
+                },
+                "method": "get",
+                "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('org13ab69e2.crm'))}/tables/@{encodeURIComponent(encodeURIComponent('crce4_quizdatas'))}/items",
+                "queries": {
+                    "$filter": "mati_qno eq @{triggerBody()?['question_id']}"
+                }
+            }
+        },
+        "correct_judge": {
+            "actions": {
+                "var_set_addscore": {
+                    "runAfter": {},
+                    "type": "SetVariable",
+                    "inputs": {
+                        "name": "addscore",
+                        "value": "@variables('Score')"
+                    }
+                }
+            },
+            "runAfter": {
+                "var_set_score_and_correct": [
+                    "Succeeded"
+                ]
+            },
+            "expression": {
+                "and": [
+                    {
+                        "equals": [
+                            "@toUpper(triggerBody()?['answer_id'])",
+                            "@variables('Correct')"
+                        ]
+                    }
+                ]
+            },
+            "type": "If"
+        },
+        "isFirst_judge": {
+            "actions": {
+                "add_QuizUserManagement": {
+                    "runAfter": {},
+                    "type": "ApiConnection",
+                    "inputs": {
+                        "body": {
+                            "_ownerid_type": "systemusers",
+                            "mati_guid": "@triggerBody()?['identifier']",
+                            "mati_name": "@triggerBody()?['nickname']",
+                            "mati_score": "@variables('addscore')",
+                            "statuscode": 1
+                        },
+                        "host": {
+                            "connection": {
+                                "name": "@parameters('$connections')['commondataservice']['connectionId']"
+                            }
+                        },
+                        "method": "post",
+                        "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('org13ab69e2.crm'))}/tables/@{encodeURIComponent(encodeURIComponent('mati_quizusermanagements'))}/items"
+                    }
+                }
+            },
+            "runAfter": {
+                "correct_judge": [
+                    "Succeeded"
+                ]
+            },
+            "else": {
+                "actions": {
+                    "var_count_add": {
+                        "runAfter": {
+                            "条件": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "IncrementVariable",
+                        "inputs": {
+                            "name": "count",
+                            "value": 1
+                        }
+                    },
+                    "条件": {
+                        "actions": {
+                            "Get_QuizUserManagement": {
+                                "runAfter": {},
+                                "type": "ApiConnection",
+                                "inputs": {
+                                    "host": {
+                                        "connection": {
+                                            "name": "@parameters('$connections')['commondataservice']['connectionId']"
+                                        }
+                                    },
+                                    "method": "get",
+                                    "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('org13ab69e2.crm'))}/tables/@{encodeURIComponent(encodeURIComponent('mati_quizusermanagements'))}/items",
+                                    "queries": {
+                                        "$filter": "mati_guid eq @{triggerBody()?['identifier']}"
+                                    }
+                                }
+                            },
+                            "var_set_addscore_loop": {
+                                "foreach": "@body('Get_QuizUserManagement')?['value']",
+                                "actions": {
+                                    "Update_QuizUserManagement": {
+                                        "runAfter": {
+                                            "var_add_addscore": [
+                                                "Succeeded"
+                                            ]
+                                        },
+                                        "type": "ApiConnection",
+                                        "inputs": {
+                                            "body": {
+                                                "_ownerid_type": "",
+                                                "mati_score": "@variables('addscore')"
+                                            },
+                                            "host": {
+                                                "connection": {
+                                                    "name": "@parameters('$connections')['commondataservice']['connectionId']"
+                                                }
+                                            },
+                                            "method": "patch",
+                                            "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('org13ab69e2.crm'))}/tables/@{encodeURIComponent(encodeURIComponent('mati_quizusermanagements'))}/items/@{encodeURIComponent(encodeURIComponent(items('var_set_addscore_loop')?['mati_quizusermanagementid']))}"
+                                        }
+                                    },
+                                    "var_add_addscore": {
+                                        "runAfter": {},
+                                        "type": "IncrementVariable",
+                                        "inputs": {
+                                            "name": "addscore",
+                                            "value": "@items('var_set_addscore_loop')?['mati_score']"
+                                        }
+                                    }
+                                },
+                                "runAfter": {
+                                    "Get_QuizUserManagement": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "type": "Foreach",
+                                "runtimeConfiguration": {
+                                    "concurrency": {
+                                        "repetitions": 1
+                                    }
+                                }
+                            }
+                        },
+                        "runAfter": {},
+                        "expression": {
+                            "and": [
+                                {
+                                    "equals": [
+                                        "@variables('count')",
+                                        0
+                                    ]
+                                }
+                            ]
+                        },
+                        "type": "If"
+                    }
+                }
+            },
+            "expression": {
+                "and": [
+                    {
+                        "equals": [
+                            "@triggerBody()?['isFirst']",
+                            "@true"
+                        ]
+                    }
+                ]
+            },
+            "type": "If"
+        },
+        "var_init_addscore": {
+            "runAfter": {
+                "var_init_correct": [
+                    "Succeeded"
+                ]
+            },
+            "type": "InitializeVariable",
+            "inputs": {
+                "variables": [
+                    {
+                        "name": "addscore",
+                        "type": "integer",
+                        "value": 0
+                    }
+                ]
+            }
+        },
+        "var_init_correct": {
+            "runAfter": {
+                "var_init_score": [
+                    "Succeeded"
+                ]
+            },
+            "type": "InitializeVariable",
+            "inputs": {
+                "variables": [
+                    {
+                        "name": "Correct",
+                        "type": "string"
+                    }
+                ]
+            }
+        },
+        "var_init_count": {
+            "runAfter": {
+                "var_init_addscore": [
+                    "Succeeded"
+                ]
+            },
+            "type": "InitializeVariable",
+            "inputs": {
+                "variables": [
+                    {
+                        "name": "count",
+                        "type": "integer",
+                        "value": 0
+                    }
+                ]
+            }
+        },
+        "var_init_score": {
+            "runAfter": {},
+            "type": "InitializeVariable",
+            "inputs": {
+                "variables": [
+                    {
+                        "name": "Score",
+                        "type": "integer"
+                    }
+                ]
+            }
+        },
+        "var_set_score_and_correct": {
+            "foreach": "@body('QuizData_Get')?['value']",
+            "actions": {
+                "var_set_correct": {
+                    "runAfter": {
+                        "var_set_score": [
+                            "Succeeded"
+                        ]
+                    },
+                    "type": "SetVariable",
+                    "inputs": {
+                        "name": "Correct",
+                        "value": "@items('var_set_score_and_correct')?['crce4_answer']"
+                    }
+                },
+                "var_set_score": {
+                    "runAfter": {},
+                    "type": "SetVariable",
+                    "inputs": {
+                        "name": "Score",
+                        "value": "@items('var_set_score_and_correct')?['mati_score']"
+                    }
+                }
+            },
+            "runAfter": {
+                "QuizData_Get": [
+                    "Succeeded"
+                ]
+            },
+            "type": "Foreach"
+        },
+        "回答ログ登録": {
+            "runAfter": {
+                "isFirst_judge": [
+                    "Succeeded"
+                ]
+            },
+            "type": "ApiConnection",
+            "inputs": {
+                "body": {
+                    "_ownerid_type": "systemusers",
+                    "mati_answer_id": "@triggerBody()?['answer_id']",
+                    "mati_identifier": "@triggerBody()?['identifier']",
+                    "mati_question_id": "@{triggerBody()?['question_id']}"
+                },
+                "host": {
+                    "connection": {
+                        "name": "@parameters('$connections')['commondataservice']['connectionId']"
+                    }
+                },
+                "method": "post",
+                "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('org13ab69e2.crm'))}/tables/@{encodeURIComponent(encodeURIComponent('mati_quizanswers'))}/items"
+            }
+        }
+    },
+    "outputs": {}
+}

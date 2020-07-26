@@ -1,0 +1,329 @@
+{
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "$connections": {
+            "defaultValue": {},
+            "type": "Object"
+        }
+    },
+    "triggers": {
+        "request": {
+            "type": "Request",
+            "kind": "Http",
+            "inputs": {
+                "method": "GET",
+                "schema": {}
+            }
+        }
+    },
+    "actions": {
+        "For_each": {
+            "foreach": "@body('QuizSessionDataGet')?['value']",
+            "actions": {
+                "QuizSessionDetailGet": {
+                    "runAfter": {},
+                    "type": "ApiConnection",
+                    "inputs": {
+                        "host": {
+                            "connection": {
+                                "name": "@parameters('$connections')['commondataservice']['connectionId']"
+                            }
+                        },
+                        "method": "get",
+                        "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('org13ab69e2.crm'))}/tables/@{encodeURIComponent(encodeURIComponent('mati_quizsessions'))}/items/@{encodeURIComponent(encodeURIComponent(items('For_each')?['mati_quizsessionid']))}"
+                    }
+                },
+                "var_set_quiz_category": {
+                    "runAfter": {
+                        "var_set_quiz_tail": [
+                            "Succeeded"
+                        ]
+                    },
+                    "type": "SetVariable",
+                    "inputs": {
+                        "name": "quiz_category",
+                        "value": "@items('For_each')?['mati_quiz_category']"
+                    }
+                },
+                "var_set_quiz_id": {
+                    "runAfter": {
+                        "QuizSessionDetailGet": [
+                            "Succeeded"
+                        ]
+                    },
+                    "type": "SetVariable",
+                    "inputs": {
+                        "name": "quiz_id",
+                        "value": "@items('For_each')?['mati_quizid']"
+                    }
+                },
+                "var_set_quiz_state": {
+                    "runAfter": {
+                        "var_set_quiz_id": [
+                            "Succeeded"
+                        ]
+                    },
+                    "type": "SetVariable",
+                    "inputs": {
+                        "name": "quiz_state",
+                        "value": "@items('For_each')?['mati_quizstate']"
+                    }
+                },
+                "var_set_quiz_tail": {
+                    "runAfter": {
+                        "var_set_quiz_state": [
+                            "Succeeded"
+                        ]
+                    },
+                    "type": "SetVariable",
+                    "inputs": {
+                        "name": "quiz_tail",
+                        "value": "@items('For_each')?['mati_quiztail']"
+                    }
+                }
+            },
+            "runAfter": {
+                "QuizSessionDataGet": [
+                    "Succeeded"
+                ]
+            },
+            "type": "Foreach"
+        },
+        "For_each_2": {
+            "foreach": "@body('QuizDataGet')?['value']",
+            "actions": {
+                "スイッチ": {
+                    "runAfter": {},
+                    "cases": {
+                        "ケース": {
+                            "case": "show",
+                            "actions": {
+                                "変数の設定": {
+                                    "runAfter": {},
+                                    "type": "SetVariable",
+                                    "inputs": {
+                                        "name": "rtn_body",
+                                        "value": "{\n  \"state\": \"show\",\n  \"question\": {\n    \"id\": @{variables('quiz_id')},\n    \"description\":\"@{items('For_each_2')?['crce4_question']}\",\n    \"category\":\"@{variables('quiz_category')}\",\n    \"point\": @{items('For_each_2')?['mati_score']},\n    \"position\": {\n      \"current\":@{variables('quiz_id')},  \n      \"tail\": @{variables('quiz_tail')}\n    }\n  },\n  \"choices\": {\n    \"a\": {\n      \"description\":\"@{items('For_each_2')?['crce4_a']}\"\n    },\n    \"b\": {\n      \"description\":\"@{items('For_each_2')?['crce4_b']}\"\n    },\n    \"c\": {\n      \"description\":\"@{items('For_each_2')?['crce4_c']}\"\n    },\n    \"d\": {\n      \"description\":\"@{items('For_each_2')?['crce4_d']}\"\n    }\n  }\n}"
+                                    }
+                                }
+                            }
+                        },
+                        "ケース_2": {
+                            "case": "start",
+                            "actions": {
+                                "変数の設定_2": {
+                                    "runAfter": {},
+                                    "type": "SetVariable",
+                                    "inputs": {
+                                        "name": "rtn_body",
+                                        "value": "{\n  \"state\": \"start\",\n  \"question\": {\n    \"id\": @{variables('quiz_id')},\n    \"description\":\"@{items('For_each_2')?['crce4_question']}\",\n    \"category\":\"@{variables('quiz_category')}\",\n    \"point\": @{items('For_each_2')?['mati_score']},\n    \"position\": {\n      \"current\":@{variables('quiz_id')},  \n      \"tail\": @{variables('quiz_tail')}\n    }\n  },\n  \"choices\": {\n    \"a\": {\n      \"description\":\"@{items('For_each_2')?['crce4_a']}\"\n    },\n    \"b\": {\n      \"description\":\"@{items('For_each_2')?['crce4_b']}\"\n    },\n    \"c\": {\n      \"description\":\"@{items('For_each_2')?['crce4_c']}\"\n    },\n    \"d\": {\n      \"description\":\"@{items('For_each_2')?['crce4_d']}\"\n    }\n  }\n}"
+                                    }
+                                }
+                            }
+                        },
+                        "ケース_3": {
+                            "case": "finish",
+                            "actions": {
+                                "変数の設定_3": {
+                                    "runAfter": {},
+                                    "type": "SetVariable",
+                                    "inputs": {
+                                        "name": "rtn_body",
+                                        "value": "{\n  \"state\": \"finish\",\n  \"question\": {\n    \"id\": @{variables('quiz_id')},\n    \"description\":\"@{items('For_each_2')?['crce4_question']}\",\n    \"category\":\"@{variables('quiz_category')}\",\n    \"point\": @{items('For_each_2')?['mati_score']},\n    \"position\": {\n      \"current\":@{variables('quiz_id')},  \n      \"tail\": @{variables('quiz_tail')}\n    }\n  },\n  \"choices\": {\n    \"a\": {\n      \"description\":\"@{items('For_each_2')?['crce4_a']}\"\n    },\n    \"b\": {\n      \"description\":\"@{items('For_each_2')?['crce4_b']}\"\n    },\n    \"c\": {\n      \"description\":\"@{items('For_each_2')?['crce4_c']}\"\n    },\n    \"d\": {\n      \"description\":\"@{items('For_each_2')?['crce4_d']}\"\n    }\n  },\n  \"correct\": {\n    \"choice\":\"@{items('For_each_2')?['crce4_answer']}\",\n    \"description\":\"@{items('For_each_2')?['crce4_overview']}\"\n  }\n}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "default": {
+                        "actions": {
+                            "変数の設定_4": {
+                                "runAfter": {},
+                                "type": "SetVariable",
+                                "inputs": {
+                                    "name": "rtn_body",
+                                    "value": "error"
+                                }
+                            }
+                        }
+                    },
+                    "expression": "@variables('quiz_state')",
+                    "type": "Switch"
+                }
+            },
+            "runAfter": {
+                "QuizDataGet": [
+                    "Succeeded"
+                ]
+            },
+            "type": "Foreach"
+        },
+        "QuizDataGet": {
+            "runAfter": {
+                "For_each": [
+                    "Succeeded"
+                ]
+            },
+            "type": "ApiConnection",
+            "inputs": {
+                "host": {
+                    "connection": {
+                        "name": "@parameters('$connections')['commondataservice']['connectionId']"
+                    }
+                },
+                "method": "get",
+                "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('org13ab69e2.crm'))}/tables/@{encodeURIComponent(encodeURIComponent('crce4_quizdatas'))}/items",
+                "queries": {
+                    "$filter": "mati_qno eq @{variables('quiz_id')}"
+                }
+            }
+        },
+        "QuizSessionDataGet": {
+            "runAfter": {
+                "var_init_rtn_body": [
+                    "Succeeded"
+                ]
+            },
+            "type": "ApiConnection",
+            "inputs": {
+                "host": {
+                    "connection": {
+                        "name": "@parameters('$connections')['commondataservice']['connectionId']"
+                    }
+                },
+                "method": "get",
+                "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('org13ab69e2.crm'))}/tables/@{encodeURIComponent(encodeURIComponent('mati_quizsessions'))}/items"
+            }
+        },
+        "var_init_quiz_category": {
+            "runAfter": {
+                "var_init_quiz_tail": [
+                    "Succeeded"
+                ]
+            },
+            "type": "InitializeVariable",
+            "inputs": {
+                "variables": [
+                    {
+                        "name": "quiz_category",
+                        "type": "string"
+                    }
+                ]
+            }
+        },
+        "var_init_quiz_id": {
+            "runAfter": {},
+            "type": "InitializeVariable",
+            "inputs": {
+                "variables": [
+                    {
+                        "name": "quiz_id",
+                        "type": "integer"
+                    }
+                ]
+            }
+        },
+        "var_init_quiz_state": {
+            "runAfter": {
+                "var_init_quiz_id": [
+                    "Succeeded"
+                ]
+            },
+            "type": "InitializeVariable",
+            "inputs": {
+                "variables": [
+                    {
+                        "name": "quiz_state",
+                        "type": "string"
+                    }
+                ]
+            }
+        },
+        "var_init_quiz_tail": {
+            "runAfter": {
+                "var_init_quiz_state": [
+                    "Succeeded"
+                ]
+            },
+            "type": "InitializeVariable",
+            "inputs": {
+                "variables": [
+                    {
+                        "name": "quiz_tail",
+                        "type": "integer"
+                    }
+                ]
+            }
+        },
+        "var_init_rtn_body": {
+            "runAfter": {
+                "var_init_quiz_category": [
+                    "Succeeded"
+                ]
+            },
+            "type": "InitializeVariable",
+            "inputs": {
+                "variables": [
+                    {
+                        "name": "rtn_body",
+                        "type": "string"
+                    }
+                ]
+            }
+        },
+        "条件": {
+            "actions": {
+                "応答": {
+                    "runAfter": {},
+                    "type": "Response",
+                    "kind": "Http",
+                    "inputs": {
+                        "body": "No Session",
+                        "statusCode": 400
+                    }
+                }
+            },
+            "runAfter": {
+                "For_each_2": [
+                    "Succeeded"
+                ]
+            },
+            "else": {
+                "actions": {
+                    "Response": {
+                        "runAfter": {},
+                        "type": "Response",
+                        "inputs": {
+                            "body": "@variables('rtn_body')",
+                            "statusCode": 200
+                        }
+                    }
+                }
+            },
+            "expression": {
+                "and": [
+                    {
+                        "equals": [
+                            "@variables('rtn_body')",
+                            "error"
+                        ]
+                    }
+                ]
+            },
+            "type": "If"
+        },
+        "終了": {
+            "runAfter": {
+                "条件": [
+                    "Succeeded"
+                ]
+            },
+            "type": "Terminate",
+            "inputs": {
+                "runStatus": "Succeeded"
+            }
+        }
+    },
+    "outputs": {}
+}
